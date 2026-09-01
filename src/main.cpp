@@ -12,9 +12,8 @@ int main() {
     std::getline(std::cin, userInput);
     if (userInput == "exit")
       break;
-    else if(userInput.empty())
+    if(userInput.empty())
       continue;
     std::cerr << std::format("{}: command not found\n", userInput);
-    continue;
   }
 }
