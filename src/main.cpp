@@ -1,4 +1,5 @@
 #include <iostream>
+#include <format>
 #include <string>
 
 int main() {
@@ -8,4 +9,7 @@ int main() {
 
   // TODO: Uncomment the code below to pass the first stage
   std::cout << "$ ";
+  std::string userInput {};
+  std::getline(std::cin>>std::ws, userInput);
+  std::cerr << std::format("{} command not found", userInput);
 }
