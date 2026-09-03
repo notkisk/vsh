@@ -1,4 +1,5 @@
 #include <cstdlib>
+#include <cassert>
 #include <ios>
 #include <iostream>
 #include <format>
@@ -6,12 +7,13 @@
 #include <vector>
 #include <string_view>
 #include <unistd.h>
+#include <tuple>
 
 
-namespace MAIN{
+// namespace ShellSpace{
 
 
-// #define DEBUG_MODE 
+#define DEBUG_MODE 
 
 #ifdef DEBUG_MODE
     #define DEBUG_PRINT(msg) std::cout << "[DEBUG] " << msg << '\n';
@@ -21,7 +23,7 @@ namespace MAIN{
 
   struct Path_Obj {
     const std::string_view ex_path;
-    bool excute_permission = false; // set to false by default
+    bool excute_permission {false}; // set to false by default
   };
 
   enum TokenKind{
@@ -77,7 +79,7 @@ namespace MAIN{
   */
 
 
-std::vector<Token> commandTokenizer(const std::string_view command) {
+std::tuple<std::string_view, std::vector<Token>> commandTokenizer(const std::string_view command) {
     std::vector<Token> tokens;
     std::size_t start = 0;
     std::size_t i = 0;
@@ -98,10 +100,51 @@ std::vector<Token> commandTokenizer(const std::string_view command) {
         }
         ++i;
     }
-  return tokens;
+
+    return {command, tokens};
+}
+
+void test_tokenizer(
+    const std::string_view command,
+    const std::vector<std::string_view>& expected
+) {
+    auto [raw_command, tokens] = commandTokenizer(command);
+    DEBUG_PRINT(std::format("Raw Command: {}", raw_command));
+    DEBUG_PRINT(std::format("Raw Command Size: {}", raw_command.size()));
+    assert(tokens.size() == expected.size());
+    std::string token_string;
+    std::size_t index{};
+    for (const auto& token : tokens) {
+        token_string += std::format("{} ", token.m_token);
+        assert(token.m_token == expected[index]);
+        ++index;
+    }
+    DEBUG_PRINT(std::format(
+        "number of tokens: {}. tokens {}",
+        tokens.size(),
+        token_string
+    ));
 }
 
   int main() {
+      using namespace std::string_view_literals;
+      test_tokenizer(
+          "echo arg1 arg2"sv,
+          {"echo"sv, "arg1"sv, "arg2"sv}
+      );
+      test_tokenizer(
+          "type  "sv,
+          {"type"sv}
+      );
+      test_tokenizer(
+          "exit       "sv,
+          {"exit"sv}
+      );
+      test_tokenizer(
+          "  echo arg1 arg2 arg3arg4  arg6"sv,
+          {"echo"sv, "arg1"sv, "arg2"sv, "arg3arg4"sv, "arg6"sv}
+      );
+
       std::cout << std::unitbuf;
       std::cerr << std::unitbuf;
 
@@ -141,7 +184,7 @@ std::vector<Token> commandTokenizer(const std::string_view command) {
                   std::cout << command << " is a shell builtin\n";
               } else {
                   bool found{false};
-                  for (const auto& path : paths) {
+                  for (auto& path : paths) {
                       std::string full_path =
                           std::format("{}/{}", path.ex_path, command);
 
@@ -164,6 +207,6 @@ std::vector<Token> commandTokenizer(const std::string_view command) {
           }
           std::cerr << std::format("{}: command not found\n", userInput);
       }
+  return 0;
   }
-
-}
+// }
