@@ -1,4 +1,5 @@
 #include <cstdlib>
+#include <optional>
 #include <cassert>
 #include <ios>
 #include <iostream>
@@ -8,9 +9,6 @@
 #include <string_view>
 #include <unistd.h>
 #include <tuple>
-
-
-// namespace ShellSpace{
 
 
 #define DEBUG_MODE 
@@ -23,7 +21,7 @@
 
   struct Path_Obj {
     const std::string_view ex_path;
-    bool excute_permission {false}; // set to false by default
+    bool execute_permission {false}; // set to false by default
   };
 
   enum TokenKind{
@@ -39,11 +37,11 @@
   };
 
   bool isWhiteSpace(std::string_view character){
-    return character == " "? true : false; // this might seem silly now, but later it will come in handy when deciding wheither we cosider certain characters
+    return character == " "; 
     // as white space like the tab! 
   }
 
-  bool checkExcuteAccessFromPath(const char* pathName) {
+  bool checkExecuteAccessFromPath(const char* pathName) {
     return access(pathName, X_OK) == 0;
   }
 
@@ -102,6 +100,14 @@ std::tuple<std::string_view, std::vector<Token>> commandTokenizer(const std::str
     }
 
     return {command, tokens};
+}
+
+std::optional<std::string> findExcutable(std::string_view command){
+  auto paths {retrievePath()};
+  for (const auto& path: paths){
+    // return excutable path 
+  }
+  return std::nullopt;
 }
 
 void test_tokenizer(
@@ -188,8 +194,8 @@ void test_tokenizer(
                       std::string full_path =
                           std::format("{}/{}", path.ex_path, command);
 
-                      if (checkExcuteAccessFromPath(full_path.c_str())) {
-                          path.excute_permission = true;
+                      if (checkExecuteAccessFromPath(full_path.c_str())) {
+                          path.execute_permission = true;
                           std::cout << std::format(
                               "{} is {}\n",
                               command,
@@ -209,4 +215,3 @@ void test_tokenizer(
       }
   return 0;
   }
-// }
