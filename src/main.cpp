@@ -11,7 +11,7 @@
 #include <tuple>
 
 
-#define DEBUG_MODE 
+// #define DEBUG_MODE 
 
 #ifdef DEBUG_MODE
     #define DEBUG_PRINT(msg) std::cout << "[DEBUG] " << msg << '\n';
@@ -36,79 +36,101 @@
     std::size_t m_index;
   };
 
-  bool isWhiteSpace(std::string_view character){
-    return character == " "; 
-    // as white space like the tab! 
-  }
+bool isWhiteSpace(std::string_view character) {
+    return character == " " || character == "\t";
+}
 
-  bool checkExecuteAccessFromPath(const char* pathName) {
+bool checkExecuteAccessFromPath(const char* pathName) {
     return access(pathName, X_OK) == 0;
-  }
+}
 
-  std::vector<Path_Obj> retrievePath() {
+std::vector<Path_Obj> retrievePath() {
     const char* path = std::getenv("PATH");
     const std::string_view path_view{path};
     std::size_t start{0};
     std::vector<Path_Obj> paths;
 
     for (std::size_t i = 0; i <= path_view.size(); ++i) {
-      if (i == path_view.size() || path_view[i] == ':') {
-        std::string_view path_part = path_view.substr(start, i - start);
+        if (i == path_view.size() || path_view[i] == ':') {
+            std::string_view path_part =
+                path_view.substr(start, i - start);
 
-        paths.push_back(
-          Path_Obj{
-            path_part
-          }
-        );
+            paths.push_back(
+                Path_Obj{path_part}
+            );
 
-        start = i + 1;
-      }
+            start = i + 1;
+        }
     }
 
     return paths;
-  }
-  /*
-  * we need a command parser! it takes a sequence of characters space seperated, and it tries to determine if 
-  * the command is an excutable command in PATH, if yes then it intrepret the arguments and pass them as arguments to that command!
-  * and excutes that command!
-  * we will start simple, take a sequence of words or characters and space seperate them, and do some preprocessing like removing the extra spaces 
-  * what i will do is, decompose this problem into multiple indipendet building blocks, starting with the one that decompose the command into tokens
-  * we will call it a tokenizer! because why not
-  */
+}
 
+std::tuple<std::string_view, std::vector<Token>>
+commandTokenizer(const std::string_view command) {
 
-std::tuple<std::string_view, std::vector<Token>> commandTokenizer(const std::string_view command) {
     std::vector<Token> tokens;
     std::size_t start = 0;
     std::size_t i = 0;
     std::size_t length = command.length();
 
     while (i <= length) {
-        // A word ends if we hit a whitespace OR reach the very end of the string
-        if (i == length || isWhiteSpace(command.substr(i,1))) {
-            // Only push a token if it contains actual characters (ignores consecutive spaces)
+
+        if (i == length || isWhiteSpace(command.substr(i, 1))) {
+
             if (i > start) {
-                Token token; 
+
+                Token token;
+
                 token.m_token = command.substr(start, i - start);
-                token.m_kind = TokenKind::WORD; // Fixed scope resolution operator (::)
-                token.m_index = 0;              // Kept as requested
+
+                if (token.m_token == "|") {
+                    token.m_kind = TokenKind::PIPE;
+                }
+                else if (token.m_token == "&&") {
+                    token.m_kind = TokenKind::AND_AND;
+                }
+                else if (token.m_token == ">" ||
+                         token.m_token == "<") {
+                    token.m_kind = TokenKind::REDIRECTION;
+                }
+                else {
+                    token.m_kind = TokenKind::WORD;
+                }
+
+                token.m_index = tokens.size();
+
                 tokens.push_back(token);
             }
+
             start = i + 1;
         }
+
         ++i;
     }
 
     return {command, tokens};
 }
 
-std::optional<std::string> findExcutable(std::string_view command){
-  auto paths {retrievePath()};
-  for (const auto& path: paths){
-    // return excutable path 
-  }
-  return std::nullopt;
+std::optional<std::string> findExcutable(
+    std::string_view command,
+    const std::vector<Path_Obj>& paths
+) {
+    for (const auto& path : paths) {
+
+        std::string full_path =
+            std::format("{}/{}", path.ex_path, command);
+
+        std::cout << "checking: " << full_path << '\n';
+
+        if (checkExecuteAccessFromPath(full_path.c_str())) {
+            return full_path;
+        }
+    }
+
+    return std::nullopt;
 }
+
 
 void test_tokenizer(
     const std::string_view command,
@@ -131,87 +153,97 @@ void test_tokenizer(
         token_string
     ));
 }
+int excuteCommand(){
+return 0;
+}
+// TODO: add a sophisticated token parser/intreperter, reads tokens types and content (and probably index) and decides how to excute it!
 
-  int main() {
-      using namespace std::string_view_literals;
-      test_tokenizer(
-          "echo arg1 arg2"sv,
-          {"echo"sv, "arg1"sv, "arg2"sv}
-      );
-      test_tokenizer(
-          "type  "sv,
-          {"type"sv}
-      );
-      test_tokenizer(
-          "exit       "sv,
-          {"exit"sv}
-      );
-      test_tokenizer(
-          "  echo arg1 arg2 arg3arg4  arg6"sv,
-          {"echo"sv, "arg1"sv, "arg2"sv, "arg3arg4"sv, "arg6"sv}
-      );
+int main() {
+    auto paths{retrievePath()};
+    using namespace std::string_view_literals;
+#ifdef DEBUG_MODE
+    test_tokenizer(
+        "echo arg1 arg2"sv,
+        {"echo"sv, "arg1"sv, "arg2"sv}
+    );
 
-      std::cout << std::unitbuf;
-      std::cerr << std::unitbuf;
+    test_tokenizer(
+        "type  "sv,
+        {"type"sv}
+    );
 
-      auto paths = retrievePath();
+    test_tokenizer(
+        "exit       "sv,
+        {"exit"sv}
+    );
 
-      while (true) {
-          std::cout << "$ ";
+    test_tokenizer(
+        "  echo arg1 arg2 arg3arg4  arg6"sv,
+        {"echo"sv, "arg1"sv, "arg2"sv, "arg3arg4"sv, "arg6"sv}
+    );
+#endif
 
-          std::string userInput{};
-          std::getline(std::cin, userInput);
+    std::cout << std::unitbuf;
+    std::cerr << std::unitbuf;
 
-          if (userInput == "exit")
-              break;
+    while (true) {
+        std::cout << "$ ";
+        std::string userInput{};
+        std::getline(std::cin, userInput);
+        if (userInput.empty())
+            continue;
+        auto [raw_command, tokens] = commandTokenizer(userInput);
 
-          if (userInput.empty())
-              continue;
+        if (tokens.empty())
+            continue;
 
-          // This is just for now, later we need a more rigorous parsing,
-          // a function that strips away spaces and new lines
-          // for better command interpretation
+        const auto& command = tokens[0].m_token;
 
-          if (userInput == "echo" ||
-              userInput.starts_with("echo ")) {
-              if (userInput == "echo") {
-                  std::cout << '\n';
-              } else {
-                  std::cout << userInput.substr(5) << '\n';
-              }
-              continue;
-          }
-          if (userInput.starts_with("type ")) {
-              std::string command = userInput.substr(5);
+        if (command == "exit")
+            break;
 
-              if (command == "echo" ||
-                  command == "exit" ||
-                  command == "type") {
-                  std::cout << command << " is a shell builtin\n";
-              } else {
-                  bool found{false};
-                  for (auto& path : paths) {
-                      std::string full_path =
-                          std::format("{}/{}", path.ex_path, command);
+        if (command == "echo") {
+            for (std::size_t i = 1; i < tokens.size(); ++i) {
+                std::cout << tokens[i].m_token;
 
-                      if (checkExecuteAccessFromPath(full_path.c_str())) {
-                          path.execute_permission = true;
-                          std::cout << std::format(
-                              "{} is {}\n",
-                              command,
-                              full_path
-                          );
-                          found = true;
-                          break;
-                      }
-                  }
-                  if (!found)
-                      std::cout << command << ": not found\n";
-              }
+                if (i + 1 < tokens.size())
+                    std::cout << ' ';
+            }
 
-              continue;
-          }
-          std::cerr << std::format("{}: command not found\n", userInput);
-      }
-  return 0;
-  }
+            std::cout << '\n';
+            continue;
+        }
+        if (command == "type") {
+            if (tokens.size() < 2) {
+                std::cout << "type: missing argument\n";
+                continue;
+            }
+            const auto& target = tokens[1].m_token;
+
+            if (target == "echo" ||
+                target == "exit" ||
+                target == "type") {
+                std::cout << target
+                          << " is a shell builtin\n";
+            }
+            else if (auto executable = findExcutable(target, paths)) {
+
+                std::cout << std::format(
+                    "{} is {}\n",
+                    target,
+                    *executable
+                );
+            }
+            else {
+                std::cout << target << ": not found\n";
+            }
+            continue;
+        }
+        std::cerr << std::format(
+            "{}: command not found\n",
+            command
+        );
+    }
+
+    return 0;
+}
