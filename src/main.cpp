@@ -1,7 +1,6 @@
 #include <cstdlib>
 #include <optional>
 #include <cassert>
-#include <ios>
 #include <iostream>
 #include <format>
 #include <string>
@@ -9,6 +8,7 @@
 #include <string_view>
 #include <unistd.h>
 #include <tuple>
+#include <sys/wait.h>
 
 
 // #define DEBUG_MODE 
@@ -105,7 +105,6 @@ commandTokenizer(const std::string_view command) {
 
             start = i + 1;
         }
-
         ++i;
     }
 
@@ -120,9 +119,9 @@ std::optional<std::string> findExcutable(
 
         std::string full_path =
             std::format("{}/{}", path.ex_path, command);
-
+    #ifdef DEBUG_MODE
         std::cout << "checking: " << full_path << '\n';
-
+    #endif
         if (checkExecuteAccessFromPath(full_path.c_str())) {
             return full_path;
         }
@@ -153,10 +152,50 @@ void test_tokenizer(
         token_string
     ));
 }
-int excuteCommand(){
-return 0;
+
+std::vector<char*> tokens_to_argv(const std::vector<Token>& tokens){
+// this one takes a series of tokens, and convert them to a c-string  vector of arguments
+
+  assert (!tokens.empty());
+  std::vector<char*> argv_vector;
+  for (const auto& token : tokens){
+    char* arg = new char [token.m_token.size() + 1];
+    std::copy(token.m_token.begin(), token.m_token.end(), arg);
+    arg[token.m_token.size()] = '\0';
+    argv_vector.push_back(arg);
+  }
+  argv_vector.push_back(nullptr);
+  return argv_vector;
+} 
+
+int excuteCommand(
+    std::string_view path,
+    std::vector<char*>& argv
+) {
+    pid_t pid = fork();
+    if (pid == -1) {
+        return -1;
+    }
+    if (pid == 0) {
+        execv(path.data(), argv.data());
+        perror("execv");
+        _exit(1);
+    }
+    if (waitpid(pid, nullptr, 0) == -1){
+      perror("waitpid");
+      return -1;
+    }
+    
+    for (char* arg: argv){
+      if (arg != nullptr)
+        delete [] arg;
+  }
+    return 0;
 }
+
 // TODO: add a sophisticated token parser/intreperter, reads tokens types and content (and probably index) and decides how to excute it!
+
+
 
 int main() {
     auto paths{retrievePath()};
@@ -193,10 +232,8 @@ int main() {
         if (userInput.empty())
             continue;
         auto [raw_command, tokens] = commandTokenizer(userInput);
-
         if (tokens.empty())
             continue;
-
         const auto& command = tokens[0].m_token;
 
         if (command == "exit")
@@ -209,10 +246,10 @@ int main() {
                 if (i + 1 < tokens.size())
                     std::cout << ' ';
             }
-
             std::cout << '\n';
             continue;
         }
+
         if (command == "type") {
             if (tokens.size() < 2) {
                 std::cout << "type: missing argument\n";
@@ -237,8 +274,21 @@ int main() {
             else {
                 std::cout << target << ": not found\n";
             }
+
             continue;
         }
+
+        // external command
+        if (auto executable = findExcutable(command, paths)) {
+
+            auto argv = tokens_to_argv(tokens);
+
+            if (excuteCommand(*executable, argv) == -1) {
+                std::cerr << "failed to execute " << command << '\n';
+            }
+            continue;
+        }
+
         std::cerr << std::format(
             "{}: command not found\n",
             command
