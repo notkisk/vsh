@@ -1,1 +1,1 @@
-## sota shell written in gods one of best creations, c++
+## shell written in one of gods best creations, c++
