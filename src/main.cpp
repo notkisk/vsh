@@ -1,4 +1,6 @@
 #include <cstdlib>
+#include <filesystem>
+#include <ranges>
 #include <optional>
 #include <cassert>
 #include <iostream>
@@ -9,7 +11,7 @@
 #include <unistd.h>
 #include <tuple>
 #include <sys/wait.h>
-
+#include <cstring>
 
 // #define DEBUG_MODE 
 
@@ -68,20 +70,15 @@ std::vector<Path_Obj> retrievePath() {
 
 std::tuple<std::string_view, std::vector<Token>>
 commandTokenizer(const std::string_view command) {
-
     std::vector<Token> tokens;
     std::size_t start = 0;
     std::size_t i = 0;
     std::size_t length = command.length();
-
     while (i <= length) {
-
         if (i == length || isWhiteSpace(command.substr(i, 1))) {
 
             if (i > start) {
-
                 Token token;
-
                 token.m_token = command.substr(start, i - start);
 
                 if (token.m_token == "|") {
@@ -102,12 +99,10 @@ commandTokenizer(const std::string_view command) {
 
                 tokens.push_back(token);
             }
-
             start = i + 1;
         }
         ++i;
     }
-
     return {command, tokens};
 }
 
@@ -193,6 +188,75 @@ int excuteCommand(
     return 0;
 }
 
+// pwd -L: Prints the symbolic path. 
+// pwd -P: Prints the actual path.
+
+
+// we will be using 
+// char *getcwd(char *buf, size_t size);
+std::optional<std::tuple<char*, std::int16_t>>
+pwd_builtin(std::vector<char*> argv) noexcept
+{
+    std::int16_t status{};
+    // argv[0] is "pwd"
+    // argv[1] is the optional argument.
+    bool isLogical{true}; // pwd defaults to logical
+    if (argv.size() > 1 && argv[1] != nullptr) {
+        std::string_view arg{argv[1]};
+
+        if (arg == "-P" || arg == "-p") {
+            isLogical = false;
+        } else if (arg == "-L" || arg == "-l") {
+            isLogical = true;
+        } else {
+            std::cerr << "pwd: invalid option: " << arg << '\n';
+            status = -1;
+            return std::nullopt;
+        }
+    }
+    if (isLogical) {
+        // TODO: eventually use the shell's logical PWD.
+        std::string logical_path =
+            std::filesystem::absolute(
+                std::filesystem::current_path()
+            ).string();
+        char* buffer = static_cast<char*>(
+            std::malloc(logical_path.size() + 1)
+        );
+        if (buffer == nullptr) {
+            perror("pwd allocation failed");
+            status = -1;
+            return std::nullopt;
+        }
+        std::memcpy(
+            buffer,
+            logical_path.c_str(),
+            logical_path.size() + 1
+        );
+
+        return std::make_tuple(buffer, status);
+    }
+    // Physical path.
+    std::string physical_path =
+        std::filesystem::canonical(
+            std::filesystem::current_path()
+        ).string();
+
+    char* buffer = static_cast<char*>(
+        std::malloc(physical_path.size() + 1)
+    );
+    if (buffer == nullptr) {
+        perror("pwd allocation failed");
+        status = -1;
+        return std::nullopt;
+    }
+    std::memcpy(
+        buffer,
+        physical_path.c_str(),
+        physical_path.size() + 1
+    );
+    return std::make_tuple(buffer, status);
+}
 // TODO: add a sophisticated token parser/intreperter, reads tokens types and content (and probably index) and decides how to excute it!
 
 
@@ -248,6 +312,16 @@ int main() {
             }
             std::cout << '\n';
             continue;
+        } else if (command == "pwd") {
+            auto result = pwd_builtin(tokens_to_argv(tokens));
+
+            if (result) {
+                auto [path, status] = *result;
+                std::cout << path << '\n';
+                std::free(path);
+            }
+
+            continue;
         }
 
         if (command == "type") {
@@ -259,7 +333,8 @@ int main() {
 
             if (target == "echo" ||
                 target == "exit" ||
-                target == "type") {
+                target == "type" || 
+                target == "pwd") {
                 std::cout << target
                           << " is a shell builtin\n";
             }
