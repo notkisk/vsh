@@ -426,7 +426,6 @@ int main() {
 
             continue;
         }
-
         std::cerr << std::format(
             "{}: command not found\n",
             command
