@@ -100,6 +100,7 @@ commandTokenizer(const std::string_view command) {
 
                 tokens.push_back(token);
             }
+
             start = i + 1;
         }
         ++i;
@@ -193,29 +194,49 @@ int excuteCommand(
 // pwd -P: Prints the actual path.
 
 std::int16_t cd_builtin(const char *path){
-  std::string_view pwd {std::getenv("PWD")};
-  const std::string_view old_pwd {std::getenv("OLDPWD")};
-  std::cout << pwd << '\n';;
-  std::cout << old_pwd << '\n';
-  // i think we need to add some context that is given to any command before excution, context might have the currecnt working directory, so a command 
-  // like pwd will know that we are doing pwd on which directory, because right now pwd or ls only shows the the directory the project is at or from where the shell is 
-  // working, changing directory using cd won't be reflected on the behaviour of both ls and pwd or any other simmilar command,
-  // for cd implimintation, i think we only have to update the current working directory by altering the value of PWD, or something
-  // new value of pwd is givie as context to all commands, so they need to check where we are before excuting or somehing, not sure this is my first evaluation 
-  // for the problem 
-  char buffer [256];
-  getcwd(buffer, sizeof(buffer));
-  std::cout << "Before: "<< buffer <<'\n';
-  if(chdir(path) == 0){
-    getcwd(buffer, sizeof(buffer));
-    std::cout << "After: " << buffer << '\n';
-    return 0;
-  }else {
-    perror("Failed to change directory");
-  }
-  return -1;
-}
+    if (path == nullptr){
+        std::cerr << "cd: missing argument\n";
+        return -1;
+    }
+    std::string_view path_view{path};
 
+    if (path_view == "~"){
+        const char* home{std::getenv("HOME")};
+
+        if (home == nullptr){
+            std::cerr << "cd: HOME not set\n";
+            return -1;
+        }
+        if (chdir(home) == 0){
+            return 0;
+        }
+        std::cerr << "cd: " << home << ": ";
+        perror("");
+        return -1;
+    }
+    if (path_view.starts_with("~/")){
+        const char* home{std::getenv("HOME")};
+        if (home == nullptr){
+            std::cerr << "cd: HOME not set\n";
+            return -1;
+        }
+        std::string expanded{
+            std::format("{}{}", home, path_view.substr(1))
+        };
+        if (chdir(expanded.c_str()) == 0){
+            return 0;
+        }
+        std::cerr << "cd: " << expanded << ": ";
+        perror("");
+        return -1;
+    }
+    if (chdir(path) == 0){
+        return 0;
+    }
+    std::cerr << "cd: " << path << ": ";
+    perror("");
+    return -1;
+}
 
 // we will be using 
 // char *getcwd(char *buf, size_t size);
@@ -228,7 +249,6 @@ pwd_builtin(std::vector<char*> argv) noexcept
     bool isLogical{true}; // pwd defaults to logical
     if (argv.size() > 1 && argv[1] != nullptr) {
         std::string_view arg{argv[1]};
-
         if (arg == "-P" || arg == "-p") {
             isLogical = false;
         } else if (arg == "-L" || arg == "-l") {
@@ -245,6 +265,7 @@ pwd_builtin(std::vector<char*> argv) noexcept
             std::filesystem::absolute(
                 std::filesystem::current_path()
             ).string();
+
         char* buffer = static_cast<char*>(
             std::malloc(logical_path.size() + 1)
         );
@@ -258,7 +279,6 @@ pwd_builtin(std::vector<char*> argv) noexcept
             logical_path.c_str(),
             logical_path.size() + 1
         );
-
         return std::make_tuple(buffer, status);
     }
     // Physical path.
@@ -270,26 +290,30 @@ pwd_builtin(std::vector<char*> argv) noexcept
     char* buffer = static_cast<char*>(
         std::malloc(physical_path.size() + 1)
     );
+
     if (buffer == nullptr) {
         perror("pwd allocation failed");
         status = -1;
         return std::nullopt;
     }
+
     std::memcpy(
         buffer,
         physical_path.c_str(),
         physical_path.size() + 1
     );
+
     return std::make_tuple(buffer, status);
 }
+
 // TODO: add a sophisticated token parser/intreperter, reads tokens types and content (and probably index) and decides how to excute it!
 
 
-
 int main() {
-  cd_builtin("..");
+ 
     auto paths{retrievePath()};
     using namespace std::string_view_literals;
+
 #ifdef DEBUG_MODE
     test_tokenizer(
         "echo arg1 arg2"sv,
@@ -325,10 +349,8 @@ int main() {
         if (tokens.empty())
             continue;
         const auto& command = tokens[0].m_token;
-
         if (command == "exit")
             break;
-
         if (command == "echo") {
             for (std::size_t i = 1; i < tokens.size(); ++i) {
                 std::cout << tokens[i].m_token;
@@ -346,10 +368,25 @@ int main() {
                 std::cout << path << '\n';
                 std::free(path);
             }
+            continue;
 
+        } else if (command == "cd") {
+            if (tokens.size() == 1){
+                const char* home{std::getenv("HOME")};
+                if(home == nullptr){
+                    std::cerr << "cd: HOME not set\n";
+                }else{
+                    cd_builtin(home);
+                }
+                continue;
+            }
+            if (tokens.size() > 2){
+                std::cerr << "cd: too many arguments\n";
+                continue;
+            }
+            cd_builtin(tokens[1].m_token.c_str());
             continue;
         }
-
         if (command == "type") {
             if (tokens.size() < 2) {
                 std::cout << "type: missing argument\n";
@@ -360,7 +397,9 @@ int main() {
             if (target == "echo" ||
                 target == "exit" ||
                 target == "type" || 
-                target == "pwd") {
+                target == "pwd" ||
+                target == "cd") {
+
                 std::cout << target
                           << " is a shell builtin\n";
             }
@@ -375,22 +414,23 @@ int main() {
             else {
                 std::cout << target << ": not found\n";
             }
-
             continue;
         }
         // external command
         if (auto executable = findExcutable(command, paths)) {
             auto argv = tokens_to_argv(tokens);
+
             if (excuteCommand(*executable, argv) == -1) {
                 std::cerr << "failed to execute " << command << '\n';
             }
+
             continue;
         }
+
         std::cerr << std::format(
             "{}: command not found\n",
             command
         );
     }
-
     return 0;
 }
