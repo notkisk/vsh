@@ -1,3 +1,4 @@
+#include <cstdint>
 #include <cstdlib>
 #include <filesystem>
 #include <ranges>
@@ -191,6 +192,30 @@ int excuteCommand(
 // pwd -L: Prints the symbolic path. 
 // pwd -P: Prints the actual path.
 
+std::int16_t cd_builtin(const char *path){
+  std::string_view pwd {std::getenv("PWD")};
+  const std::string_view old_pwd {std::getenv("OLDPWD")};
+  std::cout << pwd << '\n';;
+  std::cout << old_pwd << '\n';
+  // i think we need to add some context that is given to any command before excution, context might have the currecnt working directory, so a command 
+  // like pwd will know that we are doing pwd on which directory, because right now pwd or ls only shows the the directory the project is at or from where the shell is 
+  // working, changing directory using cd won't be reflected on the behaviour of both ls and pwd or any other simmilar command,
+  // for cd implimintation, i think we only have to update the current working directory by altering the value of PWD, or something
+  // new value of pwd is givie as context to all commands, so they need to check where we are before excuting or somehing, not sure this is my first evaluation 
+  // for the problem 
+  char buffer [256];
+  getcwd(buffer, sizeof(buffer));
+  std::cout << "Before: "<< buffer <<'\n';
+  if(chdir(path) == 0){
+    getcwd(buffer, sizeof(buffer));
+    std::cout << "After: " << buffer << '\n';
+    return 0;
+  }else {
+    perror("Failed to change directory");
+  }
+  return -1;
+}
+
 
 // we will be using 
 // char *getcwd(char *buf, size_t size);
@@ -262,6 +287,7 @@ pwd_builtin(std::vector<char*> argv) noexcept
 
 
 int main() {
+  cd_builtin("..");
     auto paths{retrievePath()};
     using namespace std::string_view_literals;
 #ifdef DEBUG_MODE
@@ -352,18 +378,14 @@ int main() {
 
             continue;
         }
-
         // external command
         if (auto executable = findExcutable(command, paths)) {
-
             auto argv = tokens_to_argv(tokens);
-
             if (excuteCommand(*executable, argv) == -1) {
                 std::cerr << "failed to execute " << command << '\n';
             }
             continue;
         }
-
         std::cerr << std::format(
             "{}: command not found\n",
             command
