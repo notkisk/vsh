@@ -16,4 +16,8 @@ add_executable(shell
 
 target_include_directories(shell PRIVATE include)
 
-
+target_compile_options(shell PRIVATE
+  -Wall
+  -Wextra
+  # -pedantic-errors
+)
