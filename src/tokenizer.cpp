@@ -2,12 +2,15 @@
 
 namespace {
 TokenKind kindOf(std::string_view token) {
-  if (token == "|") return TokenKind::Pipe;
-  if (token == "&&") return TokenKind::AndAnd;
-  if (token == ">" || token == "<") return TokenKind::Redirection;
+  if (token == "|")
+    return TokenKind::Pipe;
+  if (token == "&&")
+    return TokenKind::AndAnd;
+  if (token == ">" || token == "<")
+    return TokenKind::Redirection;
   return TokenKind::Word;
 }
-}
+} // namespace
 
 Tokens tokenize(std::string_view command) {
   Tokens tokens;
@@ -15,7 +18,8 @@ Tokens tokenize(std::string_view command) {
   bool quoted = false;
 
   auto addToken = [&] {
-    if (current.empty()) return;
+    if (current.empty())
+      return;
     tokens.push_back({current, kindOf(current), tokens.size()});
     current.clear();
   };

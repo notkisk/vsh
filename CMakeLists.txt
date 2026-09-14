@@ -1,12 +1,19 @@
-cmake_minimum_required(VERSION 3.13)
+cmake_minimum_required(VERSION 3.20)
 
-project(shell-starter-cpp)
+project(shell)
 
-file(GLOB_RECURSE SOURCE_FILES src/*.cpp)
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+#don't fall back to older versions of c++ standard if c++23 is not available
 
-set(CMAKE_CXX_STANDARD 23) # Enable the C++23 standard
-
-add_executable(shell ${SOURCE_FILES})
+add_executable(shell
+  src/main.cpp
+  src/builtins.cpp
+  src/path.cpp
+  src/process.cpp
+  src/tokenizer.cpp
+)
 
 target_include_directories(shell PRIVATE include)
-target_link_libraries(shell PRIVATE readline)
+
+

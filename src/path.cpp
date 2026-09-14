@@ -4,8 +4,9 @@
 #include <unistd.h>
 
 std::vector<std::string> retrievePath() {
-  const char* environmentPath = std::getenv("PATH");
-  if (environmentPath == nullptr) return {};
+  const char *environmentPath = std::getenv("PATH");
+  if (environmentPath == nullptr)
+    return {};
 
   std::vector<std::string> paths;
   std::string path{environmentPath};
@@ -19,13 +20,15 @@ std::vector<std::string> retrievePath() {
   return paths;
 }
 
-std::optional<std::string> findExecutable(
-    std::string_view command, const std::vector<std::string>& paths) {
-  for (const auto& directory : paths) {
+std::optional<std::string>
+findExecutable(std::string_view command,
+               const std::vector<std::string> &paths) {
+  for (const auto &directory : paths) {
     std::string fullPath = directory.empty()
                                ? std::string{command}
                                : directory + "/" + std::string{command};
-    if (access(fullPath.c_str(), X_OK) == 0) return fullPath;
+    if (access(fullPath.c_str(), X_OK) == 0)
+      return fullPath;
   }
   return std::nullopt;
 }
