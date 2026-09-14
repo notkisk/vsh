@@ -1,4 +1,5 @@
-#pragma once
+#ifndef SHELL_TYPES_HPP
+#define SHELL_TYPES_HPP
 
 #include <cstddef>
 #include <string>
@@ -13,3 +14,4 @@ struct Token {
 };
 
 using Tokens = std::vector<Token>;
+#endif
