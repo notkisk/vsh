@@ -19,25 +19,42 @@ Tokens tokenize(std::string_view command) {
   Tokens tokens;
   std::string current;
   char current_quote = '\0';
+  bool token_started = false;
 
   auto addToken = [&] {
-    if (current.empty())
+    if (!token_started)
       return;
     tokens.push_back({current, kindOf(current), tokens.size()});
     current.clear();
+    token_started = false;
   };
 
-  for (char character : command) {
+  for (std::size_t i = 0; i < command.size(); ++i) {
+    const char character = command[i];
     if (current_quote != '\0') {
       if (character == current_quote) {
         current_quote = '\0';
+      } else if (current_quote == '"' && character == '\\' &&
+                 i + 1 < command.size() &&
+                 (command[i + 1] == '"' || command[i + 1] == '\\')) {
+        current += command[++i];
       } else {
         current += character;
       }
+      token_started = true;
       continue;
     }
     if (character == '\'' || character == '"') {
       current_quote = character;
+      token_started = true;
+      continue;
+    }
+    if (character == '\\') {
+      token_started = true;
+      if (i + 1 < command.size())
+        current += command[++i];
+      else
+        current += character;
       continue;
     }
 
@@ -45,6 +62,7 @@ Tokens tokenize(std::string_view command) {
       addToken();
       continue;
     }
+    token_started = true;
     current += character;
   }
   if (current_quote != '\0') {
